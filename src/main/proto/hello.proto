@@ -4,10 +4,53 @@ package hello;
 
 message HelloRequest {
   string name = 1;
+  optional string title = 2;
+
+  enum Language {
+    LANGUAGE_UNSPECIFIED = 0;
+    ENGLISH = 1;
+    SPANISH = 2;
+    PUNJABI = 3;
+  }
+
+  Language preferred_language = 3;
+
+  message ClientInfo {
+    string app_name = 1;
+    string app_version = 2;
+  }
+
+  ClientInfo client = 4;
+
+  oneof contact_method {
+    string email = 5;
+    string phone_number = 6;
+  }
 }
 
 message HelloReply {
   string message = 1;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    OK = 1;
+    INVALID_ARGUMENT = 2;
+  }
+
+  Status status = 2;
+  optional string debug_id = 3;
+
+  message ReplyMetadata {
+    int64 generated_at_epoch_ms = 1;
+    string server = 2;
+  }
+
+  ReplyMetadata metadata = 4;
+
+  oneof extra_data {
+    string follow_up = 5;
+    bytes raw_payload = 6;
+  }
 }
 
 service HelloService {
