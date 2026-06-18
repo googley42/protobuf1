@@ -7,6 +7,7 @@ on:
       - 'src/main/proto/**'
       - 'build.sbt'
       - 'project/**'
+      - '.github/workflows/ci.yml'
 
 jobs:
   docs:
