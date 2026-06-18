@@ -32,3 +32,15 @@ You should see two calls:
 1. A rich request using optional title, enum language, nested client info, and oneof email.
 2. An invalid request path that returns `INVALID_ARGUMENT` and a debug id.
 
+## API docs
+
+The server serves generated HTML documentation at `http://localhost:8080/` while it is running.
+
+To regenerate the docs after editing `hello.proto`:
+
+```bash
+sbt --no-colors compile
+```
+
+Then restart the server — it reads `docs/generated/index.html` from disk on each request.
+
