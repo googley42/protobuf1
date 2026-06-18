@@ -64,6 +64,51 @@ Then install the binary (e.g. `brew install protoc-gen-doc` on macOS) and `sbt c
 
 The generated file can be served statically by adding a simple HTTP handler to `HelloServer` (e.g. via the JDK's built-in `com.sun.net.httpserver.HttpServer`) so the running service itself hosts its own docs.
 
+**How to run the documentation process**
+
+1. **Install `protoc-gen-doc`**
+
+   ```bash
+   brew install protoc-gen-doc   # macOS
+   # Linux: download the binary from https://github.com/pseudomuto/protoc-gen-doc/releases
+   #        and place it on your PATH
+   ```
+
+   Verify: `protoc-gen-doc --version` should print a version string.
+
+2. **Update `build.sbt`** — extend `PB.targets` to add the doc generator alongside the existing ScalaPB target:
+
+   ```scala
+   Compile / PB.targets := Seq(
+     scalapb.gen(grpc = true) -> (Compile / sourceManaged).value,
+     PB.gens.plugin("doc") -> (baseDirectory.value / "docs" / "generated")
+   )
+   ```
+
+3. **Create the output directory** (only needed once):
+
+   ```bash
+   mkdir -p docs/generated
+   ```
+
+4. **Annotate `src/main/proto/hello.proto`** with doc comments as shown in the *Comment style* example above — one `//` comment directly above each message, field, enum value, or RPC.
+
+5. **Generate the docs**:
+
+   ```bash
+   sbt --no-colors compile
+   ```
+
+   ScalaPB and `protoc-gen-doc` run in the same `protoc` invocation. The plugin writes `docs/generated/index.html`.
+
+6. **View the output**:
+
+   ```bash
+   open docs/generated/index.html   # macOS — opens in your default browser
+   ```
+
+   The HTML contains a section per message and per service, with a field-by-field table and the inline comments rendered as descriptions.
+
 ---
 
 ### Option 2: Buf Schema Registry (BSR)

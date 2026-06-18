@@ -2,12 +2,17 @@ syntax = "proto3";
 
 package hello;
 
+// HelloRequest carries caller identity and contact preferences for a SayHello call.
 message HelloRequest {
+  // name is the caller's display name. Required; an empty value returns INVALID_ARGUMENT.
   string name = 1;
+
+  // title is an optional honorific (e.g. "Dr", "Ms").
   optional string title = 2;
 
+  // Language controls the greeting language in the reply.
   enum Language {
-    LANGUAGE_UNSPECIFIED = 0;
+    LANGUAGE_UNSPECIFIED = 0; // Default; server falls back to ENGLISH.
     ENGLISH = 1;
     SPANISH = 2;
     PUNJABI = 3;
@@ -15,44 +20,55 @@ message HelloRequest {
 
   Language preferred_language = 3;
 
+  // ClientInfo identifies the calling application for observability.
   message ClientInfo {
-    string app_name = 1;
-    string app_version = 2;
+    string app_name = 1;    // e.g. "my-service"
+    string app_version = 2; // e.g. "1.4.2"
   }
 
   ClientInfo client = 4;
 
+  // contact_method is mutually exclusive: supply either email or phone_number.
   oneof contact_method {
     string email = 5;
     string phone_number = 6;
   }
 }
 
+// HelloReply is the response returned by SayHello.
 message HelloReply {
+  // message is the human-readable greeting text.
   string message = 1;
 
+  // Status indicates whether the request was handled successfully.
   enum Status {
-    STATUS_UNSPECIFIED = 0;
-    OK = 1;
-    INVALID_ARGUMENT = 2;
+    STATUS_UNSPECIFIED = 0; // Should not be used.
+    OK = 1;                 // Request processed successfully.
+    INVALID_ARGUMENT = 2;   // Request was rejected due to invalid input.
   }
 
   Status status = 2;
+
+  // debug_id is an optional correlation token for tracing individual requests.
   optional string debug_id = 3;
 
+  // ReplyMetadata carries server-side telemetry attached to each response.
   message ReplyMetadata {
-    int64 generated_at_epoch_ms = 1;
-    string server = 2;
+    int64 generated_at_epoch_ms = 1; // Unix timestamp (ms) when the reply was generated.
+    string server = 2;               // Hostname of the server that handled the request.
   }
 
   ReplyMetadata metadata = 4;
 
+  // extra_data carries optional supplementary output; at most one field is set.
   oneof extra_data {
-    string follow_up = 5;
-    bytes raw_payload = 6;
+    string follow_up = 5;   // A suggested follow-up prompt.
+    bytes raw_payload = 6;  // Opaque binary payload for debugging.
   }
 }
 
+// HelloService provides a simple greeting RPC.
 service HelloService {
+  // SayHello returns a greeting for the given HelloRequest.
   rpc SayHello (HelloRequest) returns (HelloReply);
 }
