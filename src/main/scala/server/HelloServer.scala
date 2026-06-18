@@ -81,6 +81,7 @@ object HelloServer extends App {
       .build
 
   server.start()
+  DocsServer.start()
 
   println("gRPC server started on port 50051")
 
