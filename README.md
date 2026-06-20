@@ -34,13 +34,13 @@ You should see two calls:
 
 ## API docs
 
-The server serves generated HTML documentation at `http://localhost:8080/` while it is running.
+The server serves HTML documentation generated from `hello.proto` comments at `http://localhost:8080/`. The docs are bundled on the classpath as part of `sbt compile` (no separate output directory) and read via the classpath at runtime, so they work in a deployed JAR without any filesystem dependency.
 
-To regenerate the docs after editing `hello.proto`:
+To regenerate after editing `hello.proto`:
 
 ```bash
 sbt --no-colors compile
 ```
 
-Then restart the server — it reads `docs/generated/index.html` from disk on each request.
+Then restart the server.
 
