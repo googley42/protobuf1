@@ -65,6 +65,8 @@ sbt --no-colors "runMain server.HelloServer"
 
 Then open `http://localhost:8080/`.
 
+An example of the rendered output is at [docs/index.html](index.html).
+
 ## CI
 
 `.github/workflows/ci.yml` installs `protoc-gen-doc`, runs `sbt compile`, and uploads the generated `index.html` as a build artifact on every push to `main` that touches `.proto` files or build configuration.
