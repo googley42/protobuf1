@@ -6,7 +6,33 @@ API documentation for `HelloService` is generated from `//` comments in `hello.p
 
 `protoc-gen-doc` is a `protoc` plugin that reads doc comments from `.proto` files and emits HTML. It runs as part of the normal `sbt compile` step via `sbt-protoc`, alongside the ScalaPB code generator.
 
-The generated `index.html` is written into sbt's managed resource directory so it is bundled on the classpath — meaning it is available in a deployed JAR with no filesystem dependency. `DocsServer` reads it via `getClass.getResourceAsStream("/docs/index.html")` and serves it on port 8080 using the JDK's built-in `HttpServer` (no extra dependencies).
+The generated `index.html` is written into a **namespaced** path in sbt's managed resource directory:
+
+```
+docs/<service-name>/index.html
+```
+
+This means the HTML is bundled on the classpath at a predictable, service-scoped location — available in a deployed JAR with no filesystem dependency.
+
+When the server starts, `DocsServer` scans the classpath for all resources matching `docs/*/index.html` and builds a root index dynamically. Any JAR on the classpath that follows this convention is discovered automatically — you get its docs for free just by having it as a dependency.
+
+## Multi-module architecture
+
+The convention scales naturally to environments with multiple SBT modules (e.g., a separate module for external-facing protocols with its own publishing lifecycle):
+
+```
+my-org/
+  proto-external/   ← publishes JAR with docs/external-api/index.html
+  proto-internal/   ← publishes JAR with docs/internal-api/index.html
+  my-service/       ← depends on both; server discovers both at startup
+```
+
+The external proto module team does not need to run a docs server. They bundle docs at the standard path when they publish. Any internal service that takes a dependency on their JAR gets those docs surfaced automatically in its own docs index. The running service's index at `/` dynamically reflects whatever is on the classpath at that moment.
+
+```
+GET /                            → dynamic index of all discovered services
+GET /docs/<service>/index.html   → docs for that specific service
+```
 
 ## Setup
 
@@ -21,16 +47,16 @@ Verify: `protoc-gen-doc --version` should print a version string.
 
 ### `build.sbt` configuration
 
-The doc generator target is wired into `PB.targets` alongside ScalaPB:
+The doc generator target is wired into `PB.targets` alongside ScalaPB, with an explicit service name in the output path:
 
 ```scala
 Compile / PB.targets := Seq(
   scalapb.gen(grpc = true) -> (Compile / sourceManaged).value,
-  PB.gens.plugin("doc") -> (Compile / resourceManaged).value / "docs"
+  PB.gens.plugin("doc") -> (Compile / resourceManaged).value / "docs" / "hello-service"
 )
 ```
 
-Output lands at `target/scala-<version>/resource_managed/main/docs/index.html`, which sbt puts on the classpath automatically.
+Output lands at `target/scala-<version>/resource_managed/main/docs/hello-service/index.html`, which sbt puts on the classpath automatically.
 
 ## Annotating `.proto` files
 
@@ -63,7 +89,7 @@ sbt --no-colors compile
 sbt --no-colors "runMain server.HelloServer"
 ```
 
-Then open `http://localhost:8080/`.
+Then open `http://localhost:8080/` for the index, or `http://localhost:8080/docs/hello-service/index.html` directly.
 
 An example of the rendered output is at [docs/index.html](index.html).
 
@@ -83,8 +109,6 @@ on:
       - 'project/**'
       - '.github/workflows/ci.yml'
 ```
-
-The path filter skips unrelated commits. `build.sbt` and `project/**` are included so the job re-runs when the ScalaPB or `protoc-gen-doc` plugin configuration changes, not only when proto source changes.
 
 ### Steps
 
@@ -113,7 +137,7 @@ The path filter skips unrelated commits. `build.sbt` and `project/**` are includ
         uses: actions/upload-artifact@v4
         with:
           name: api-docs
-          path: target/scala-3.3.7/resource_managed/main/docs/index.html
+          path: target/scala-3.3.7/resource_managed/main/docs/hello-service/index.html
           if-no-files-found: error
 ```
 
@@ -127,10 +151,10 @@ The path filter skips unrelated commits. `build.sbt` and `project/**` are includ
 
 ### Artifact path
 
-Because the doc target is wired to `(Compile / resourceManaged).value / "docs"` in `build.sbt`, the generated file lands at:
+Because the doc target is wired to `(Compile / resourceManaged).value / "docs" / "hello-service"` in `build.sbt`, the generated file lands at:
 
 ```
-target/scala-3.3.7/resource_managed/main/docs/index.html
+target/scala-3.3.7/resource_managed/main/docs/hello-service/index.html
 ```
 
-The `upload-artifact` path above reflects this. If the Scala version changes, update the path to match (e.g. `target/scala-3.4.x/resource_managed/main/docs/index.html`).
+If the Scala version changes, update the path to match (e.g. `target/scala-3.4.x/...`).

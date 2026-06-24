@@ -18,7 +18,7 @@ lazy val root = (project in file("."))
     Compile / PB.protoSources := Seq(baseDirectory.value / "src" / "main" / "proto"),
     Compile / PB.targets := Seq(
       scalapb.gen(grpc = true) -> (Compile / sourceManaged).value,
-      PB.gens.plugin("doc") -> (Compile / resourceManaged).value / "docs"
+      PB.gens.plugin("doc") -> (Compile / resourceManaged).value / "docs" / "hello-service"
     ),
 
     PB.protocVersion := "3.24.3",
