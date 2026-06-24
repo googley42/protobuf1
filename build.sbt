@@ -24,7 +24,18 @@ lazy val root = (project in file("."))
     PB.protocVersion := "3.24.3",
 
     // Include managed sources for generated protobuf classes
-    Compile / unmanagedSourceDirectories += (Compile / sourceManaged).value
+    Compile / unmanagedSourceDirectories += (Compile / sourceManaged).value,
+
+    // sbt-protoc writes doc HTML to resourceManaged but doesn't register those files with sbt's
+    // resource tracking, so copyResources never moves them to classes/. Copy them explicitly
+    // after compile (by which time protoc has already run and generated the HTML).
+    Compile / compile := {
+      val result = (Compile / compile).value
+      val src = (Compile / resourceManaged).value
+      val dst = (Compile / classDirectory).value
+      if (src.exists) IO.copyDirectory(src, dst)
+      result
+    }
   )
 
 // Force all gRPC dependencies to 1.56.0

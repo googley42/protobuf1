@@ -1,37 +1,22 @@
 package server
 
 import com.sun.net.httpserver.HttpServer as JHttpServer
-import java.net.{InetSocketAddress, JarURLConnection}
+import java.net.InetSocketAddress
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
 
 object DocsServer:
 
-  // Scans all classpath entries (JARs and file directories) for docs/<name>/index.html.
-  // This means any JAR on the classpath that bundles docs at this convention is discovered
-  // automatically — including JARs published by external-facing proto modules.
+  // Each module on the classpath contributes a META-INF/grpc-docs file listing its service name.
+  // getResources returns one URL per JAR/directory that has this file, so we discover all of them
+  // without any directory scanning — the same pattern Java's ServiceLoader uses.
+  private val cl = getClass.getClassLoader
+
   private def discoverServices(): List[String] =
-    val cl = Thread.currentThread().getContextClassLoader
-    cl.getResources("docs").asScala.toList.flatMap: url =>
-      url.getProtocol match
-        case "jar" =>
-          val conn = url.openConnection().asInstanceOf[JarURLConnection]
-          try
-            conn.getJarFile.entries().asScala
-              .map(_.getName)
-              .filter(_.matches("docs/[^/]+/index\\.html"))
-              .map(_.split("/")(1))
-              .toList
-          finally conn.getInputStream.close()
-        case "file" =>
-          val dir = java.io.File(url.toURI)
-          if dir.exists && dir.isDirectory then
-            dir.listFiles().toList
-              .filter(_.isDirectory)
-              .filter(d => java.io.File(d, "index.html").exists())
-              .map(_.getName)
-          else Nil
-        case _ => Nil
-    .distinct.sorted
+    cl.getResources("META-INF/grpc-docs").asScala.toList
+      .flatMap(url => Source.fromURL(url).getLines().filter(_.nonEmpty))
+      .distinct
+      .sorted
 
   private def buildIndex(services: List[String]): Array[Byte] =
     val rows = services.map: name =>
@@ -40,9 +25,16 @@ object DocsServer:
          |        <td><code>docs/$name/index.html</code></td>
          |      </tr>""".stripMargin
     .mkString("\n")
-    val empty = if services.isEmpty then
-      """<p style="color:#888">No service docs found on classpath. Run <code>sbt compile</code> to generate them.</p>"""
-    else ""
+    val body =
+      if services.isEmpty then
+        """<p style="color:#888">No service docs found on classpath. Run <code>sbt compile</code> to generate them.</p>"""
+      else
+        s"""<table>
+           |    <thead><tr><th>Service</th><th>Classpath resource</th></tr></thead>
+           |    <tbody>
+           |$rows
+           |    </tbody>
+           |  </table>""".stripMargin
     s"""<!DOCTYPE html>
        |<html lang="en">
        |<head>
@@ -62,15 +54,7 @@ object DocsServer:
        |<body>
        |  <h1>API Docs Index</h1>
        |  <p>Services discovered on the classpath:</p>
-       |  $empty
-       |  ${if services.nonEmpty then
-       s"""<table>
-          |    <thead><tr><th>Service</th><th>Classpath resource</th></tr></thead>
-          |    <tbody>
-          |$rows
-          |    </tbody>
-          |  </table>""".stripMargin
-       else ""}
+       |  $body
        |</body>
        |</html>""".stripMargin.getBytes("UTF-8")
 
@@ -79,9 +63,9 @@ object DocsServer:
 
     // /docs/<service>/... → serve the bundled HTML from classpath
     httpServer.createContext("/docs/", exchange =>
-      val path = exchange.getRequestURI.getPath           // e.g. /docs/hello-service/index.html
-      val resourcePath = path.stripPrefix("/")            // docs/hello-service/index.html
-      Option(getClass.getClassLoader.getResourceAsStream(resourcePath)) match
+      val path = exchange.getRequestURI.getPath         // /docs/hello-service/index.html
+      val resourcePath = path.stripPrefix("/")          // docs/hello-service/index.html
+      Option(cl.getResourceAsStream(resourcePath)) match
         case Some(s) =>
           val bytes = s.readAllBytes()
           s.close()

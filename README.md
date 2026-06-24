@@ -34,7 +34,14 @@ You should see two calls:
 
 ## API docs
 
-The server serves HTML documentation generated from `hello.proto` comments at `http://localhost:8080/`. The docs are bundled on the classpath as part of `sbt compile` (no separate output directory) and read via the classpath at runtime, so they work in a deployed JAR without any filesystem dependency.
+`sbt compile` generates HTML documentation from `hello.proto` comments and bundles it on the classpath. When the server runs, `DocsServer` starts an HTTP server on port 8080:
+
+| URL | Content |
+|---|---|
+| `http://localhost:8080/` | Index of all service docs discovered on the classpath |
+| `http://localhost:8080/docs/hello-service/index.html` | HelloService API reference |
+
+The index is built dynamically by scanning for `META-INF/grpc-docs` manifest files on the classpath. Any JAR that follows the convention (a `META-INF/grpc-docs` manifest + docs at `docs/<service-name>/index.html`) appears automatically in the index. This means adding a dependency on another proto module's published JAR brings its docs along for free — no extra configuration.
 
 To regenerate after editing `hello.proto`:
 
@@ -42,5 +49,5 @@ To regenerate after editing `hello.proto`:
 sbt --no-colors compile
 ```
 
-Then restart the server.
+Then restart the server. See [docs/grpc_api_doc_tools.md](docs/grpc_api_doc_tools.md) for the full design including the multi-module architecture.
 

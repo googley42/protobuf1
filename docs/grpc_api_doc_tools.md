@@ -34,6 +34,36 @@ GET /                            → dynamic index of all discovered services
 GET /docs/<service>/index.html   → docs for that specific service
 ```
 
+## Classpath mechanics
+
+Three things must be true for the docs server to work at runtime:
+
+**1. Doc HTML on the classpath**
+
+sbt-protoc writes `docs/<service-name>/index.html` to `target/.../resource_managed/main/` but does not register those files with sbt's managed resource tracking. `copyResources` therefore never moves them to `classes/`. A compile hook in `build.sbt` fills this gap:
+
+```scala
+Compile / compile := {
+  val result = (Compile / compile).value
+  val src = (Compile / resourceManaged).value
+  val dst = (Compile / classDirectory).value
+  if (src.exists) IO.copyDirectory(src, dst)
+  result
+}
+```
+
+This runs after protoc (which is part of the compile step), so the HTML exists in `resource_managed/` before the copy happens.
+
+**2. Service manifest on the classpath**
+
+`src/main/resources/META-INF/grpc-docs` is a static unmanaged resource containing the service name (`hello-service`). sbt's `copyResources` — which runs as part of `sbt run`'s dependency chain — copies it into `classes/`. For published JARs, the file is bundled at package time automatically.
+
+For multi-module pipelines, each module has its own `META-INF/grpc-docs`. `ClassLoader.getResources("META-INF/grpc-docs")` returns one URL per JAR/directory on the classpath, so all contributing modules are discovered in one call — the same pattern Java's own `ServiceLoader` uses.
+
+**3. Correct classloader in HTTP handler threads**
+
+The JDK `HttpServer` dispatches requests on its own thread pool. Those threads have a different (JDK AppClassLoader) context classloader, not sbt's `LayeredClassLoader`. `DocsServer` therefore captures `getClass.getClassLoader` once as a `val` at object-init time and uses it for all classpath lookups, rather than calling `Thread.currentThread().getContextClassLoader` inside handlers.
+
 ## Setup
 
 ### Install `protoc-gen-doc`
